@@ -8,6 +8,7 @@
 ### Mode2 Backup_1 Using
 1. When using it on streamlit, the ImageNet CNN must be like
    ```python
+   model = models.resnet50(weights=None)
    model.fc = nn.Sequential(
     nn.Linear(num_ftrs, 256),
     nn.BatchNorm1d(256),
