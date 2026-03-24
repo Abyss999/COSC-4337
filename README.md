@@ -56,7 +56,9 @@
 - **FC:** Reduced FC (1024 → 256 → 3)  
 - **Overfitting:** No (training finally stabilized)  
 
-## Attempt 6 (Current Best)
+---
+
+#### Attempt 6 (Current Best)
 - **Label Weight [bacterial, normal, viral]:** 0.8 : 6.0 : 0.6  
 - **Best Accuracy:** 0.8285  
 - **Validation Accuracy Floating Range:** 0.76 ~ 0.83  
@@ -65,7 +67,7 @@
 - **Early Stopping:** Yes (patience = 5)  
 - **Overfitting:** No (training stopped before overfitting)
 
-## Attempt 7 (Current Best)
+#### Attempt 7 (Current Best)
 - **Label Weight [bacterial, normal, viral]:** 0.7 : 7.0 : 0.4  
 - **Best Accuracy:** 0.8560  
 - **Validation Accuracy Floating Range:** 0.66 ~ 0.86  
