@@ -7,7 +7,8 @@
 
 ### Mode2 Backup_1 Using
 1. When using it on streamlit, the ImageNet CNN must be like
-   ''' model.fc = nn.Sequential(
+   ```python
+   model.fc = nn.Sequential(
     nn.Linear(num_ftrs, 256),
     nn.BatchNorm1d(256),
     nn.ReLU(),
@@ -19,4 +20,5 @@
     nn.Dropout(0.2),
 
     nn.Linear(64, 3)
-   )'''
+   )
+   ```
