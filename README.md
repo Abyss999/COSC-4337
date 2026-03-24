@@ -64,3 +64,16 @@
 - **FC:** Reduced FC (1024 → 256 → 3)  
 - **Early Stopping:** Yes (patience = 5)  
 - **Overfitting:** No (training stopped before overfitting)
+
+## Attempt 7 (Current Best)
+- **Label Weight [bacterial, normal, viral]:** 0.7 : 7.0 : 0.4  
+- **Best Accuracy:** 0.8560  
+- **Validation Accuracy Floating Range:** 0.66 ~ 0.86  
+- **DenseNet121 Freezing:** DenseBlock 1–3 frozen + DenseBlock4 后半可训练  
+- **FC:** Reduced FC (1024 → 256 → 3)  
+- **Early Stopping:** Yes (patience = 5)  
+- **Overfitting:** No  
+- **Confusion Highlights:**  
+  - BACTERIAL: 224 / 240（16 → NORMAL）  
+  - NORMAL: 205 / 231（9 → BACTERIAL，17 → VIRAL）  
+  - VIRAL: 100 / 147（37 → BACTERIAL，10 → NORMAL）
