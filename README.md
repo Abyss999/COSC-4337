@@ -4,9 +4,39 @@
 2.  Under the 'API' section, click 'Create New API Token'. This will download a `kaggle.json` file.
 3.  Upload this `kaggle.json` file to your Colab environment. You can do this by clicking the 'Files' icon on the left sidebar (folder icon), then 'Upload to session storage' icon, and selecting your `kaggle.json` file.
 
+### How to deploy Model 2 in streamlit
+```
+import torch
+import torch.nn as nn
+from torchvision import models
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# This must match Model 2 training architecture 100%
+model = models.densenet121(weights=models.DenseNet121_Weights.DEFAULT)
+
+num_ftrs = model.classifier.in_features
+model.classifier = nn.Sequential(
+    nn.Linear(num_ftrs, 256),
+    nn.ReLU(),
+    nn.Dropout(0.4),
+    nn.Linear(256, 3)
+)
+
+model = model.to(device)
+
+
+# Replace "model2.pth" with your actual filename
+state_dict = torch.load("Model2.pth", map_location=device)
+model.load_state_dict(state_dict)
+
+model.eval()
+print("Model loaded successfully!")
+
+```
+
 
 ### Training Log on Model 2 (DenseNet121)
-
 
 #### Attempt 1
 - **Label Weight [bacterial, normal, viral]:** 1 : 3.0 : 1  
