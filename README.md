@@ -36,6 +36,21 @@ print("Model loaded successfully!")
 ```
 
 
+### How to Run the Streamlit App
+
+```bash
+# From the project root — first time setup
+python -m venv venv
+source venv/bin/activate        # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+
+# Run the app
+python -m streamlit run app/app.py
+```
+> Use `python -m streamlit` instead of bare `streamlit` to ensure the venv's packages are used.
+
+---
+
 ### Training Log on Model 2 (DenseNet121)
 
 #### Attempt 1

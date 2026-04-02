@@ -1,3 +1,6 @@
 pandas
 torch
+torchvision
 streamlit
+Pillow
+plotly
