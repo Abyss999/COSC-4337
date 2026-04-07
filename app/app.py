@@ -11,11 +11,13 @@ _DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL1_PATH = os.path.join(_DIR, "..", "Models", "Model2.pth")
 MODEL2_PATH = os.path.join(_DIR, "..", "Models", "Model1.pth")
 
-# class labels 
-CLASSES = ["Bacterial", "Normal", "Viral"]
-PNEUMONIA_CLASSES = {"Bacterial", "Viral"}
+# class labels
+M1_CLASSES = ["Normal", "Pneumonia", "Tuberculosis"]
+M2_CLASSES = ["Bacterial", "Normal", "Viral"]
+M2_PNEUMONIA_TYPES = {"Bacterial", "Viral"}
+PNEUMONIA_THRESHOLD = 0.80
 
-# pre processing 
+# pre processing
 TRANSFORM = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
@@ -23,7 +25,7 @@ TRANSFORM = transforms.Compose([
                          std=[0.229, 0.224, 0.225]),
 ])
 
-# load models 
+# load models
 @st.cache_resource
 def load_model1():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -66,32 +68,43 @@ def load_model2():
     model.eval()
     return model, device
 
-# inference 
-def run_inference(model, device, image: Image.Image):
+# inference
+def run_inference(model, device, image: Image.Image, classes):
     """Returns (predicted_label, probabilities_list) for a PIL image."""
     tensor = TRANSFORM(image).unsqueeze(0).to(device)
     with torch.no_grad():
         logits = model(tensor)
         probs = F.softmax(logits, dim=1).squeeze().cpu().tolist()
     pred_idx = probs.index(max(probs))
-    return CLASSES[pred_idx], probs
+    return classes[pred_idx], probs
 
-# resolve conflict 
-def resolve_conflict(m1_label, m1_probs, m2_label, m2_probs):
+# combine predictions
+def combine_predictions(m1_probs, m2_label, m2_probs):
     """
-    Called when Model 1 and Model 2 disagree on pneumonia type.
-    Picks the model with higher confidence in its top prediction.
-    Both models share the same CLASSES list (Bacterial / Normal / Viral).
+    Determine final result using Model 1's Pneumonia confidence as a threshold.
+    - If M1 Pneumonia confidence > 80%: ignore M2's Normal, pick higher of M2's Bacterial/Viral.
+    - If M1 Pneumonia confidence <= 80%: respect M2's prediction fully (including Normal).
+    Returns (final_label, reasoning_str).
     """
-    m1_confidence = max(m1_probs[i] for i, c in enumerate(CLASSES) if c in PNEUMONIA_CLASSES)
-    m2_confidence = max(m2_probs[i] for i, c in enumerate(CLASSES) if c in PNEUMONIA_CLASSES)
+    m1_pneumonia_conf = m1_probs[M1_CLASSES.index("Pneumonia")]
 
-    if m1_confidence >= m2_confidence:
-        return m1_label, "Model 1", m1_confidence
+    if m1_pneumonia_conf > PNEUMONIA_THRESHOLD:
+        pneumonia_probs = {c: m2_probs[i] for i, c in enumerate(M2_CLASSES) if c in M2_PNEUMONIA_TYPES}
+        final_label = max(pneumonia_probs, key=pneumonia_probs.get)
+        reason = (
+            f"Model 1 Pneumonia confidence {m1_pneumonia_conf*100:.1f}% > 80% — "
+            f"Model 2's Normal overridden; picking **{final_label}** from Model 2's pneumonia types."
+        )
     else:
-        return m2_label, "Model 2", m2_confidence
+        final_label = m2_label
+        reason = (
+            f"Model 1 Pneumonia confidence {m1_pneumonia_conf*100:.1f}% \u2264 80% — "
+            f"respecting Model 2's result: **{final_label}**."
+        )
 
-# chart 
+    return final_label, reason
+
+# chart
 def prob_bar_chart(labels, probs, title, highlight_idx=None):
     colors = []
     for i in range(len(labels)):
@@ -116,11 +129,11 @@ def prob_bar_chart(labels, probs, title, highlight_idx=None):
     )
     return fig
 
-# main ui 
+# main ui
 def main():
-    st.set_page_config(page_title="Pneumonia X-Ray Classifier", layout="wide")
-    st.title("Pneumonia X-Ray Classifier")
-    st.caption("DenseNet121 — Bacterial / Normal / Viral")
+    st.set_page_config(page_title="Chest X-Ray Classifier", layout="wide")
+    st.title("Chest X-Ray Classifier")
+    st.caption("Model 1: Normal / Pneumonia / Tuberculosis   |   Model 2 (if Pneumonia): Bacterial / Normal / Viral")
 
     uploaded = st.file_uploader("Upload a chest X-ray image", type=["png", "jpg", "jpeg"])
 
@@ -137,71 +150,66 @@ def main():
         st.image(image, use_container_width=True)
 
     with col_results:
-        # model 1 
-        st.subheader("Model 1 — Primary Classifier")
+        # model 1
+        st.subheader("Model 1 — Triage Classifier")
         with st.spinner("Running Model 1..."):
             try:
                 model1, device1 = load_model1()
-                m1_label, m1_probs = run_inference(model1, device1, image)
+                m1_label, m1_probs = run_inference(model1, device1, image, M1_CLASSES)
             except Exception as e:
                 st.error(f"Model 1 failed to load or run: {e}")
                 return
 
-        m1_pred_idx = CLASSES.index(m1_label)
+        m1_pred_idx = M1_CLASSES.index(m1_label)
         st.plotly_chart(
-            prob_bar_chart(CLASSES, m1_probs, "Model 1 — Class Probabilities", highlight_idx=m1_pred_idx),
+            prob_bar_chart(M1_CLASSES, m1_probs, "Model 1 — Class Probabilities", highlight_idx=m1_pred_idx),
             use_container_width=True,
         )
 
         if m1_label == "Normal":
-            st.success("Result: **NORMAL** — no pneumonia detected.")
+            st.success("Result: **NORMAL** — no abnormality detected.")
+        elif m1_label == "Tuberculosis":
+            st.error("Result: **TUBERCULOSIS** detected.")
         else:
-            st.error(f"Result: **PNEUMONIA** — type: **{m1_label}**")
+            st.warning("Result: **PNEUMONIA** detected — running subtype classifier...")
 
-    # model 2 (conditional)
-    if m1_label in PNEUMONIA_CLASSES:
+    # model 2 (only when Model 1 says Pneumonia)
+    if m1_label == "Pneumonia":
         st.divider()
-        st.subheader("Model 2 — Secondary Classifier")
+        st.subheader("Model 2 — Pneumonia Subtype Classifier")
 
         model2, device2 = load_model2()
 
         if model2 is None:
             st.warning(
-                "Model 2 is not yet available (`Models/Model3.pth` not found). "
-                "Add the model file to enable secondary classification."
+                "Model 2 is not yet available. "
+                "Add the model file to enable subtype classification."
             )
         else:
             with st.spinner("Running Model 2..."):
                 try:
-                    m2_label, m2_probs = run_inference(model2, device2, image)
+                    m2_label, m2_probs = run_inference(model2, device2, image, M2_CLASSES)
                 except Exception as e:
                     st.error(f"Model 2 failed to run: {e}")
                     return
 
-            m2_pred_idx = CLASSES.index(m2_label)
+            m2_pred_idx = M2_CLASSES.index(m2_label)
             st.plotly_chart(
-                prob_bar_chart(CLASSES, m2_probs, "Model 2 — Class Probabilities", highlight_idx=m2_pred_idx),
+                prob_bar_chart(M2_CLASSES, m2_probs, "Model 2 — Class Probabilities", highlight_idx=m2_pred_idx),
                 use_container_width=True,
             )
 
-            # verdict 
+            # verdict
             st.divider()
             st.subheader("Final Verdict")
 
-            if m1_label == m2_label:
-                st.success(f"Both models agree: **{m1_label} Pneumonia**")
+            final_label, reasoning = combine_predictions(m1_probs, m2_label, m2_probs)
+
+            st.info(reasoning)
+            if final_label == "Normal":
+                st.success("Final Result: **NORMAL** — Model 2 indicates no pneumonia.")
             else:
-                st.warning(
-                    f"Models conflict — Model 1 says **{m1_label}**, Model 2 says **{m2_label}**. "
-                    "Resolving by highest confidence..."
-                )
-                final_label, winning_model, confidence = resolve_conflict(
-                    m1_label, m1_probs, m2_label, m2_probs
-                )
-                st.info(
-                    f"{winning_model} wins with {confidence * 100:.1f}% confidence.  \n"
-                    f"Final result: **{final_label} Pneumonia**"
-                )
+                st.error(f"Final Result: **{final_label} Pneumonia**")
 
 
 if __name__ == "__main__":
