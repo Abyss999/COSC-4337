@@ -8,8 +8,8 @@ import streamlit as st
 import plotly.graph_objects as go
 
 _DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL1_PATH = os.path.join(_DIR, "..", "Models", "Model2.pth")
-MODEL2_PATH = os.path.join(_DIR, "..", "Models", "Model1.pth")
+MODEL1_PATH = os.path.join(_DIR, "..", "Models", "Model1.pth")
+MODEL2_PATH = os.path.join(_DIR, "..", "Models", "Model2.pth")
 
 # class labels
 M1_CLASSES = ["Normal", "Pneumonia", "Tuberculosis"]
@@ -32,9 +32,13 @@ def load_model1():
     model = models.densenet121(weights=models.DenseNet121_Weights.DEFAULT)
     num_ftrs = model.classifier.in_features
     model.classifier = nn.Sequential(
-        nn.Linear(num_ftrs, 256),
+        nn.Linear(num_ftrs, 512),
+        nn.BatchNorm1d(512),
         nn.ReLU(),
-        nn.Dropout(0.4),
+        nn.Dropout(),
+        nn.Linear(512, 256),
+        nn.ReLU(),
+        nn.Dropout(),
         nn.Linear(256, 3),
     )
     model = model.to(device)
@@ -53,13 +57,9 @@ def load_model2():
     model = models.densenet121(weights=models.DenseNet121_Weights.DEFAULT)
     num_ftrs = model.classifier.in_features
     model.classifier = nn.Sequential(
-        nn.Linear(num_ftrs, 512),
-        nn.BatchNorm1d(512),
+        nn.Linear(num_ftrs, 256),
         nn.ReLU(),
-        nn.Dropout(),
-        nn.Linear(512, 256),
-        nn.ReLU(),
-        nn.Dropout(),
+        nn.Dropout(0.4),
         nn.Linear(256, 3),
     )
     model = model.to(device)
